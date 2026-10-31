@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Avistar Identity Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: full-bleed isometric machine on canvas, story rail left, tools bottom-right. Single dark look by design. */
+:root{
+  --signal:#FF4B1F;
+  --ion:#1FDDFF;
+  --black:#060708;
+  --ink:#141414;
+  --paper:#F5F3F0;
+  --muted:#8C8E93;
+  --line:rgba(245,243,240,.12);
+  --panel:rgba(20,20,20,.72);
+  --display:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--black);color:var(--paper);font-family:var(--display);overflow:hidden;-webkit-font-smoothing:antialiased}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+body.editing #cv{cursor:crosshair}
+body.dragging #cv{cursor:grabbing}
+
+.ui{transition:opacity .4s ease}
+body.clean .ui{opacity:0;pointer-events:none}
+.tools,.top{display:none!important}
+
+.top{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding-top:calc(env(safe-area-inset-top,0px) + 22px);
+  padding-left:max(28px,env(safe-area-inset-left,0px));padding-right:max(28px,env(safe-area-inset-right,0px));pointer-events:none}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:22px;letter-spacing:-.01em}
+.brand svg{width:30px;height:30px}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:right;max-width:52ch;margin:0}
+
+.steps{position:fixed;left:max(clamp(48px,6vw,96px),env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:min(380px,34vw);
+  list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;isolation:isolate}
+.steps::before{content:"";position:absolute;left:-160px;right:-200px;top:-140px;bottom:-120px;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at 30% 70%,rgba(11,11,12,.94) 0%,rgba(11,11,12,.82) 45%,rgba(11,11,12,0) 72%)}
+.step button{all:unset;cursor:pointer;display:grid;grid-template-columns:44px 1fr;align-items:center;column-gap:30px;width:100%;padding:6px 0;border-radius:12px}
+.step button:focus-visible{outline:2px solid var(--ion);outline-offset:4px}
+.num{width:44px;height:44px;display:grid;place-items:center;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .35s ease,filter .35s ease;opacity:.5;filter:saturate(.4)}
+.num img{width:52px;height:52px;object-fit:contain;display:block;pointer-events:none}
+.ttl{font-size:16px;font-weight:500;color:var(--muted);transition:color .35s ease;text-wrap:balance}
+.hl{font-style:normal;background:linear-gradient(90deg,var(--signal),var(--ion));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.step:not(.on) .hl{opacity:.75}
+.step.on .num{opacity:1;filter:none;transform:scale(1.25)}
+.step.on .ttl{color:var(--paper);font-size:22px;font-weight:600;letter-spacing:-.01em}
+.body{display:grid;grid-template-columns:44px 1fr;column-gap:30px;grid-template-rows:0fr;transition:grid-template-rows .45s ease}
+.step.on .body{grid-template-rows:1fr}
+.body>*{overflow:hidden;min-height:0}
+.rail{position:relative;justify-self:center;width:2px;background:var(--line);margin:0}
+.rail i{position:absolute;left:0;top:0;width:2px;height:calc(var(--p,0)*100%);background:var(--paper)}
+.body p{margin:0;padding:4px 0 14px;font-size:15px;line-height:1.55;color:rgba(245,243,240,.72);max-width:38ch}
+.kicker{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.k1{color:var(--ion)}.k2{color:var(--signal)}.k3{color:var(--ion)}.k4{color:var(--paper)}
+
+.legend{position:fixed;left:max(28px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
+  display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);max-width:min(560px,60vw)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend svg{width:12px;height:12px}
+.legend .sep{width:1px;height:12px;background:var(--line)}
+.sw{width:9px;height:9px;border-radius:50%}
+
+.tools{position:fixed;right:max(24px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 20px);display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.btn{all:unset;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:9px 13px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--line);color:var(--paper);backdrop-filter:blur(8px);transition:border-color .2s,background .2s}
+.btn:hover{border-color:rgba(245,243,240,.35)}
+.btn:focus-visible{outline:2px solid var(--ion);outline-offset:2px}
+.btn[aria-pressed="true"]{background:var(--paper);color:var(--black)}
+.btn.hot{border-color:var(--signal);color:var(--signal)}
+.panel[hidden]{display:none}
+.panel{width:min(360px,80vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px}
+.panel p{margin:0;font-size:12px;line-height:1.5;color:rgba(245,243,240,.7)}
+.panel textarea{width:100%;height:130px;resize:vertical;background:var(--black);color:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:var(--mono);font-size:11px;line-height:1.4;box-sizing:border-box}
+.panel .row{justify-content:flex-start}
+.msg{font-family:var(--mono);font-size:11px;color:var(--ion);min-height:1em}
+.keyhint{position:fixed;right:max(24px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(140,142,147,.7)}
+input[type=file]{display:none}
+
+@media (max-width:760px){
+  .tag,.legend,.tools,.keyhint{display:none}
+  .steps{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:none;width:auto;right:max(16px,env(safe-area-inset-right,0px));left:max(16px,env(safe-area-inset-left,0px));
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px 14px;backdrop-filter:blur(10px)}
+  .step:not(.on) button{display:none}
+  .step.on .ttl{font-size:18px}
+  .top{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+@media (prefers-reduced-motion:reduce){.ui,.body,.num,.ttl{transition:none}}
+</style>
+<style>*{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<canvas id="cv" role="img" aria-label="Animated isometric machine: machine identities flow in as grey particles, get mapped and scored by risk, and critical ones are fixed at their source before looping back"></canvas>
+
+<header class="top ui">
+  <div class="brand">
+    <svg viewBox="880 470 4640 4040" aria-hidden="true"><defs><linearGradient id="mk" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF4B1F"/><stop offset="1" stop-color="#1FDDFF"/></linearGradient></defs><path id="mkp" fill="url(#mk)" d=""/></svg>
+  </div>
+</header>
+
+<ol class="steps ui" id="steps">
+  <li class="step on"><button type="button" data-i="0"><span class="num"><img src="mascots/magnifier.png" alt=""></span><span class="ttl">Every machine identity, <em class="hl c">found</em></span></button>
+    <div class="body"><div class="rail"><i></i></div><div><p><span class="kicker k1">Discover</span>Avistar connects read-only to AWS, Azure and Google Cloud and maps every service account, key, token and AI agent. Grey particles are identities nobody has mapped yet.</p></div></div></li>
+  <li class="step"><button type="button" data-i="1"><span class="num"><img src="mascots/shield.png" alt=""></span><span class="ttl">Ranked by how far they <em class="hl o">reach</em></span></button>
+    <div class="body"><div class="rail"><i></i></div><div><p><span class="kicker k2">Prioritize</span>Each identity gets an owner and a risk score from low to critical, based on its access and how stale it is. Low risk clears. Critical is pulled aside.</p></div></div></li>
+  <li class="step"><button type="button" data-i="2"><span class="num"><img src="mascots/clipboard.png" alt=""></span><span class="ttl">Fixed where it was <em class="hl c">created</em></span></button>
+    <div class="body"><div class="rail"><i></i></div><div><p><span class="kicker k3">Remediate</span>Critical findings trace back to the pipeline or repo that made them, so the fix lands in your software lifecycle and the identity comes back clean.</p></div></div></li>
+  <li class="step"><button type="button" data-i="3"><span class="num"><img src="mascots/bucket.png" alt=""></span><span class="ttl">Kept <em class="hl g">current</em> as the cloud changes</span></button>
+    <div class="body"><div class="rail"><i></i></div><div><p><span class="kicker k4">Repeat</span>The loop keeps running, surfacing new, drifting and orphaned credentials before an attacker finds them.</p></div></div></li>
+</ol>
+
+
+<div class="tools ui">
+  <div class="panel" id="panel" hidden>
+    <p>Drag the white dots on the canvas to lay each stream over your Gemini image. Copy the line data to keep it, or paste saved data and apply.</p>
+    <label for="json" class="kicker" style="color:var(--muted);margin:0">Line data</label>
+    <textarea id="json" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="btn" id="copy" type="button">Copy</button>
+      <button class="btn" id="apply" type="button">Apply</button>
+      <button class="btn" id="reset" type="button">Reset lines</button>
+    </div>
+    <div class="msg" id="msg" aria-live="polite"></div>
+  </div>
+  <input type="file" id="file" accept="image/*">
+</div>
+
+<script>
+(() => {
+'use strict';
+const LOGO = "M3266.0 1552.6Q3219.6 1475.5 3265.2 1398.0L3712.2 638.4Q3757.8 560.9 3804.2 638.0L4267.1 1409.2Q4313.4 1486.3 4267.7 1563.8L3821.0 2321.8Q3775.3 2399.4 3728.9 2322.2ZM4899.1 2666.7Q4945.3 2589.5 4990.9 2667.1L5440.3 3431.7Q5485.9 3509.3 5440.6 3587.1L4991.9 4358.5Q4946.7 4436.3 4900.3 4359.2L4438.4 3592.0Q4392.0 3514.9 4438.2 3437.7ZM2564.4 579.2Q2609.1 501.1 2699.1 502.9L3604.5 521.6Q3694.5 523.4 3649.7 601.5L3211.7 1366.6Q3167.0 1444.8 3077.0 1443.0L2171.0 1425.7Q2081.0 1424.0 2125.7 1345.9ZM3748.2 2604.0Q3793.5 2526.3 3883.5 2528.0L4780.1 2545.5Q4870.1 2547.2 4825.4 2625.4L4384.1 3398.0Q4339.4 3476.2 4249.5 3474.7L3339.8 3459.3Q3249.8 3457.8 3295.2 3380.1ZM3307.0 3644.9Q3262.7 3566.5 3352.7 3564.7L4238.9 3546.3Q4328.9 3544.4 4372.5 3623.2L4807.6 4409.0Q4851.2 4487.8 4761.2 4488.1L3875.5 4491.8Q3785.5 4492.1 3741.3 4413.8ZM3126.2 1657.4Q3171.6 1579.6 3218.3 1656.6L3680.9 2418.3Q3727.6 2495.2 3682.0 2572.8L3235.1 3334.7Q3189.6 3412.3 3142.8 3335.4L2681.5 2576.2Q2634.8 2499.3 2680.2 2421.5ZM1579.8 2449.8Q1489.8 2449.1 1534.5 2371.0L1978.0 1596.6Q2022.8 1518.5 2112.8 1519.2L3024.5 1526.3Q3114.5 1527.0 3069.9 1605.1L2627.4 2379.9Q2582.8 2458.0 2492.8 2457.3ZM2556.3 2670.9Q2602.6 2593.7 2648.1 2671.4L3097.0 3439.4Q3142.4 3517.1 3097.2 3594.9L2654.2 4358.2Q2609.0 4436.0 2562.3 4359.1L2095.7 3591.6Q2048.9 3514.7 2095.3 3437.5ZM1394.7 2609.1Q1439.4 2531.0 1529.4 2531.5L2418.0 2536.7Q2508.0 2537.2 2464.8 2616.2L2037.6 3398.5Q1994.5 3477.5 1904.5 3475.4L1001.7 3454.6Q911.7 3452.5 956.4 3374.4ZM969.5 3629.3Q926.2 3550.4 1016.2 3549.7L1898.0 3542.7Q1988.0 3542.0 2031.6 3620.7L2467.5 4407.6Q2511.1 4486.3 2421.1 4486.7L1532.0 4490.3Q1442.0 4490.7 1398.7 4411.8Z";
+document.getElementById('mkp').setAttribute('d', LOGO);
+const logoPath = new Path2D(LOGO);
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const RM = matchMedia('(prefers-reduced-motion: reduce)');
+const SW = 1600, SH = 900;
+
+// ---------- palette: Signal Red to Ion Cyan in OKLab (same as the halftone mark) ----------
+const PAL = (() => {
+  const toLin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const toS = c => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+  const oklab = (r, g, b) => { r = toLin(r); g = toLin(g); b = toLin(b);
+    const l = Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b), m = Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b), s = Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
+    return [0.2104542553*l+0.7936177850*m-0.0040720468*s, 1.9779984951*l-2.4285922050*m+0.4505937099*s, 0.0259040371*l+0.7827717662*m-0.8086757660*s]; };
+  const rgb = (L, A, B) => { const l = (L+0.3963377774*A+0.2158037573*B)**3, m = (L-0.1055613458*A-0.0638541728*B)**3, s = (L-0.0894841775*A-1.2914855480*B)**3;
+    return [4.0767416621*l-3.3077115913*m+0.2309699292*s, -1.2684380046*l+2.6097574011*m-0.3413193965*s, -0.0041960863*l-0.7034186147*m+1.7076147010*s].map(v => Math.max(0, Math.min(255, Math.round(toS(Math.max(0, v)))))); };
+  const a = oklab(255, 75, 31), b = oklab(31, 221, 255), out = [];
+  for (let i = 0; i < 24; i++) { const t = i / 23; out.push(rgb(a[0]+(b[0]-a[0])*t, (a[1]+(b[1]-a[1])*t)*1.15, (a[2]+(b[2]-a[2])*t)*1.15)); }
+  out.push([128, 132, 138]);
+  return out;
+})();
+const GREY = 24, CYAN = 23, RED = 0;
+
+// glyph sprites: 0 dot, 1 ring, 2 asterisk, 3 tri-spoke, 4 small dot
+const SPR = [0,1,2,3,4].map(g => PAL.map(([R,G,B]) => {
+  const s = 32, c = document.createElement('canvas'); c.width = c.height = s; const x = c.getContext('2d');
+  const m = s/2, rad = s*0.4, col = `rgb(${R},${G},${B})`;
+  x.fillStyle = col; x.strokeStyle = col; x.lineCap = 'round'; x.lineWidth = Math.max(1, s*0.13);
+  if (g === 0) { x.beginPath(); x.arc(m, m, rad*0.92, 0, 7); x.fill(); }
+  else if (g === 1) { x.beginPath(); x.arc(m, m, rad*0.62, 0, 7); x.stroke(); }
+  else if (g === 2) { x.beginPath(); for (let k = 0; k < 3; k++) { const a = k*Math.PI/3 + Math.PI/2; x.moveTo(m+Math.cos(a)*rad, m+Math.sin(a)*rad); x.lineTo(m-Math.cos(a)*rad, m-Math.sin(a)*rad); } x.stroke(); }
+  else if (g === 3) { x.beginPath(); for (let k = 0; k < 3; k++) { const a = k*2*Math.PI/3 - Math.PI/2; x.moveTo(m, m); x.lineTo(m+Math.cos(a)*rad, m+Math.sin(a)*rad); } x.stroke(); }
+  else { x.beginPath(); x.arc(m, m, rad*0.42, 0, 7); x.fill(); }
+  return c;
+}));
+const HALO = PAL.map(([R,G,B]) => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0, `rgba(${R},${G},${B},.95)`); g.addColorStop(.3, `rgba(${R},${G},${B},.28)`); g.addColorStop(1, `rgba(${R},${G},${B},0)`);
+  x.fillStyle = g; x.fillRect(0,0,64,64); return c;
+});
+
+// ---------- isometric world to stage ----------
+const U = 46, OX = 629, OY = 218;
+const iso = (x, y, z = 0) => [OX + (x - y)*U*0.866, OY + (x + y)*U*0.5 - z*U];
+
+const MODS = {
+  A: { x0:0, y0:0, x1:7, y1:3.2, h:1.3 },
+  B: { x0:10, y0:0, x1:13.2, y1:3.2, h:1.75 },
+  C: { x0:10, y0:7, x1:13.2, y1:9.6, h:0.7 }
+};
+const WORLD_PATHS = {
+  in:   [[2,44],[2,3.2]],
+  ab:   [[7,1.6],[10,1.6]],
+  safe: [[11.6,0],[11.6,-38]],
+  risk: [[11.6,3.2],[11.6,7]],
+  ret:  [[10,8.3],[2,8.3],[2,3.2]]
+};
+const defaultPaths = () => Object.fromEntries(Object.entries(WORLD_PATHS).map(([k, p]) => [k, p.map(([x,y]) => iso(x,y).map(v => Math.round(v)))]));
+let PATHS = defaultPaths();
+try { const s = JSON.parse(localStorage.getItem('avistar-flow-paths-v2') || 'null'); if (valid(s)) PATHS = s; } catch (e) {}
+function valid(o){ return o && ['in','ab','safe','risk','ret'].every(k => Array.isArray(o[k]) && o[k].length >= 2 && o[k].every(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))); }
+
+let PP = {};
+function prepPaths(){
+  PP = {};
+  for (const [k, pts] of Object.entries(PATHS)) {
+    const L = [0];
+    for (let i = 1; i < pts.length; i++) L.push(L[i-1] + Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]));
+    PP[k] = { pts, L, len: L[L.length-1] || 1 };
+  }
+}
+function at(k, d){
+  const p = PP[k], pts = p.pts, L = p.L; d = Math.max(0, Math.min(p.len, d));
+  let i = 0; while (i < L.length - 2 && L[i+1] < d) i++;
+  const seg = (L[i+1] - L[i]) || 1, t = (d - L[i]) / seg;
+  const dx = pts[i+1][0]-pts[i][0], dy = pts[i+1][1]-pts[i][1], n = Math.hypot(dx, dy) || 1;
+  return [pts[i][0] + dx*t, pts[i][1] + dy*t, dx/n, dy/n];
+}
+
+// ---------- halftone cell field (stage space, hex grid like the mark) ----------
+const GX0 = -900, GY0 = -520, GW = SW + 1800, GH = SH + 1040;
+const SP = 10, RH = SP*0.866, COLS = Math.ceil(GW/SP) + 1, ROWS = Math.ceil(GH/RH) + 1, N = COLS*ROWS;
+const CX = new Float32Array(N), CY = new Float32Array(N), E = new Float32Array(N), BASE = new Float32Array(N), HH = new Float32Array(N), KC = new Uint8Array(N).fill(GREY);
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const i = r*COLS + c; CX[i] = GX0 + c*SP + (r % 2 ? SP/2 : 0); CY[i] = GY0 + r*RH; HH[i] = Math.random(); }
+const glowC = document.createElement('canvas'); glowC.width = COLS; glowC.height = ROWS; const glowX = glowC.getContext('2d');
+const glowImg = glowX.createImageData(COLS, ROWS);
+
+function segDist(px, py, ax, ay, bx, by){ const dx = bx-ax, dy = by-ay, l = dx*dx + dy*dy || 1; let t = ((px-ax)*dx + (py-ay)*dy)/l; t = Math.max(0, Math.min(1, t)); return Math.hypot(px-ax-dx*t, py-ay-dy*t); }
+function buildBase(){
+  BASE.fill(0);
+  const pads = [['A',300,0.05],['B',220,0.05]];
+  const centers = pads.map(([m, R, v]) => { const M = MODS[m]; return [...iso((M.x0+M.x1)/2, (M.y0+M.y1)/2), R, v]; });
+  for (let i = 0; i < N; i++) {
+    const x = CX[i], y = CY[i]; let b = 0;
+    for (const k in PP) { const pts = PP[k].pts; for (let j = 1; j < pts.length; j++) { const d = segDist(x, y, pts[j-1][0], pts[j-1][1], pts[j][0], pts[j][1]); if (d < 26) b = Math.max(b, 0.1 * (1 - d/26) + 0.04); } }
+    for (const [cx, cy, R, v] of centers) { const d = Math.hypot(x-cx, (y-cy)*1.73); if (d < R) b = Math.max(b, v * (0.4 + 0.6*(1 - d/R)) * (HH[i] > 0.35 ? 1 : 0)); }
+    BASE[i] = b;
+  }
+}
+function dep(x, y, R, amt, k){
+  const r0 = Math.max(0, Math.floor((y-R-GY0)/RH)), r1 = Math.min(ROWS-1, Math.ceil((y+R-GY0)/RH));
+  for (let r = r0; r <= r1; r++) {
+    const off = r % 2 ? SP/2 : 0, c0 = Math.max(0, Math.floor((x-R-off-GX0)/SP)), c1 = Math.min(COLS-1, Math.ceil((x+R-off-GX0)/SP));
+    for (let c = c0; c <= c1; c++) {
+      const i = r*COLS + c, dx = CX[i]-x, dy = CY[i]-y, d2 = dx*dx + dy*dy; if (d2 > R*R) continue;
+      const f = 1 - Math.sqrt(d2)/R, a = amt*f*f; if (a <= 0.002) continue;
+      if (a > E[i]*0.3) KC[i] = k; E[i] = Math.min(1, E[i] + a);
+    }
+  }
+}
+
+// ---------- particles ----------
+const P = [];
+const counts = { mapped: 0, crit: 0, fixed: 0 };
+let spawnT = 0;
+function spawn(){ P.push({ path:'in', d: Math.max(0, PP.in.len - 1100 - Math.random()*80), sp: 95 + Math.random()*35, g: (Math.random()*4)|0, k: GREY, risk: Math.random(), crit:false, fixed:false, hold:0, next:null, j:(Math.random()*2-1), x:0, y:0 }); }
+function arrive(p){
+  if (p.path === 'in' || p.path === 'ret') { p.hold = 0.45 + Math.random()*0.5; p.next = 'ab'; }
+  else if (p.path === 'ab') { p.hold = 0.35 + Math.random()*0.3; p.next = p.crit ? 'risk' : 'safe'; if (p.crit) counts.crit++; }
+  else if (p.path === 'risk') { p.hold = 0.8 + Math.random()*0.4; p.next = 'ret'; const [x, y] = at('risk', PP.risk.len); dep(x, y, 70, 0.9, CYAN); }
+  else if (p.path === 'safe') { p.dead = true; }
+}
+function leave(p){
+  if (p.next === 'ab') {
+    counts.mapped++;
+    if (p.fixed) { p.risk = 0.05 + Math.random()*0.15; }
+    p.crit = !p.fixed && p.risk > 0.72;
+    p.k = p.crit ? Math.round((1 - p.risk)/0.28*4) : 15 + Math.round((1 - p.risk)*8);
+    p.j *= 0.15;
+  } else if (p.next === 'ret') { p.fixed = true; p.crit = false; p.k = CYAN; counts.fixed++; }
+  p.path = p.next; p.d = 0; p.next = null;
+}
+
+// ---------- story steps ----------
+const STEPS = [
+  { focus: () => iso(4.2, 5), z: 1.22, mod: 'A', k: CYAN },
+  { focus: () => iso(10.6, 2.6, 0.4), z: 1.3, mod: 'B', k: RED },
+  { focus: () => iso(7.6, 7.6), z: 1.38, mod: 'C', k: CYAN },
+  { focus: () => [SW/2, SH/2], z: 1.0, mod: 'A', k: 18 }
+];
+const STEP_DUR = 7;
+let step = 0, stepT = 0;
+const stepEls = [...document.querySelectorAll('.step')];
+function setStep(i){ step = (i + STEPS.length) % STEPS.length; stepT = 0; stepEls.forEach((el, n) => el.classList.toggle('on', n === step)); }
+stepEls.forEach(el => el.querySelector('button').addEventListener('click', e => setStep(+e.currentTarget.dataset.i)));
+
+const cam = { x: SW/2, y: SH/2, z: 1 };
+let view = { s: 1, tx: 0, ty: 0, dpr: 1, vw: 1, vh: 1 };
+
+// ---------- state ----------
+let T = 0, last = performance.now(), ripR = 0;
+let img = null, showGeo = true, editing = false, drag = null;
+const mouse = { x: -1e4, y: -1e4, on: false };
+
+// ---------- drawing helpers ----------
+function poly(pts, fill){ ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
+function lg(a, b, c0, c1){ const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]); g.addColorStop(0, c0); g.addColorStop(1, c1); return g; }
+function box(x0, y0, x1, y1, z0, z1, top, xf, yf){
+  const A = iso(x1,y0,z0), B = iso(x1,y1,z0), C = iso(x0,y1,z0), A2 = iso(x1,y0,z1), B2 = iso(x1,y1,z1), C2 = iso(x0,y1,z1), D2 = iso(x0,y0,z1);
+  poly([A,B,B2,A2], Array.isArray(xf) ? lg(A2, A, xf[0], xf[1]) : xf);
+  poly([B,C,C2,B2], Array.isArray(yf) ? lg(B2, B, yf[0], yf[1]) : yf);
+  if (top) poly([D2,A2,B2,C2], Array.isArray(top) ? lg(D2, B2, top[0], top[1]) : top);
+}
+function plane(o, ax, ay, fn){ ctx.save(); ctx.transform(ax[0], ax[1], ay[0], ay[1], o[0], o[1]); fn(); ctx.restore(); }
+const onTop = (h, fn) => plane(iso(0,0,h), [U*.866, U*.5], [-U*.866, U*.5], fn);
+const onFaceY = (y, fn) => plane(iso(0,y,0), [U*.866, U*.5], [0, -U], fn);
+const onFaceX = (x, fn) => plane(iso(x,0,0), [-U*.866, U*.5], [0, -U], fn);
+function txt(s, x, y, px, weight, color, align){ ctx.save(); ctx.translate(x, y); ctx.scale(1/48, 1/48); ctx.font = `${weight} ${px}px ${weight >= 600 ? 'Geist' : '"Geist Mono"'}, ui-monospace, monospace`; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.fillText(s, 0, 0); ctx.restore(); }
+const pad = n => String(n % 10000).padStart(4, '0');
+
+function tunnel(face, at, s, w){
+  const fn = () => {
+    const g = ctx.createLinearGradient(0, 0.55, 0, 0); g.addColorStop(0, '#2a0d05'); g.addColorStop(1, '#060708');
+    ctx.fillStyle = g; ctx.fillRect(s - w/2, 0, w, 0.55);
+    ctx.save(); ctx.shadowColor = 'rgba(255,75,31,.9)'; ctx.shadowBlur = 14*view.s*view.dpr;
+    ctx.strokeStyle = '#FF6A3D'; ctx.lineWidth = 0.05; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(s - w/2 + 0.04, 0.02); ctx.lineTo(s - w/2 + 0.04, 0.5); ctx.lineTo(s + w/2 - 0.04, 0.5); ctx.lineTo(s + w/2 - 0.04, 0.02); ctx.stroke(); ctx.restore();
+  };
+  face === 'x' ? onFaceX(at, fn) : onFaceY(at, fn);
+}
+function shadow(M){
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.85)'; ctx.shadowBlur = 36*view.s*view.dpr; ctx.shadowOffsetY = 10*view.s*view.dpr;
+  poly([iso(M.x0+.1,M.y0+.1), iso(M.x1,M.y0+.1), iso(M.x1,M.y1), iso(M.x0+.1,M.y1)], '#060708'); ctx.restore();
+}
+function module(M, deco){
+  const i = 0.16, bh = M.h - 0.24;
+  shadow(M);
+  box(M.x0+i, M.y0+i, M.x1-i, M.y1-i, 0, bh, null, ['#B9B5B0','#77746F'], ['#DCD8D3','#A9A5A0']);
+  (M.tunnels || []).forEach(t => tunnel(t[0], t[0] === 'x' ? M.x1 - i : M.y1 - i, t[1], t[2]));
+  box(M.x0, M.y0, M.x1, M.y1, bh, M.h - 0.1, null, '#B8330F', '#FF4B1F');
+  box(M.x0, M.y0, M.x1, M.y1, M.h - 0.1, M.h, ['#FBFAF8','#E4E0DB'], '#CFCBC6', '#ECE9E5');
+  onTop(M.h, deco);
+}
+MODS.A.tunnels = [['y', 2, 1.1], ['x', 1.6, 1.0]];
+MODS.B.tunnels = [['y', 11.6, 1.0]];
+
+function decoA(){
+  const M = MODS.A;
+  ctx.save(); ctx.translate(3.5, 1.62); const k = 2.2/4010; ctx.scale(k, k); ctx.translate(-3197, -2492);
+  const g = ctx.createLinearGradient(908, 4497, 5483, 488); g.addColorStop(0, '#FF4B1F'); g.addColorStop(1, '#1FDDFF');
+  ctx.fillStyle = g; ctx.fill(logoPath); ctx.restore();
+  txt('01  DISCOVER', 0.32, 0.5, 12, 500, '#55575C');
+  txt('MAPPED ' + pad(counts.mapped), M.x1 - 0.32, 0.5, 12, 500, '#55575C', 'right');
+  txt('READ-ONLY  ·  AGENTLESS', 0.32, 2.98, 11, 500, '#8C8E93');
+  ctx.strokeStyle = '#FF4B1F'; ctx.lineWidth = 0.07; ctx.lineCap = 'round';
+  for (let n = 0; n < 3; n++) { ctx.beginPath(); ctx.moveTo(6.05 + n*0.22, 2.98); ctx.lineTo(6.2 + n*0.22, 2.7); ctx.stroke(); }
+}
+function decoB(){
+  ctx.strokeStyle = 'rgba(255,75,31,.75)'; ctx.lineWidth = 0.035; ctx.strokeRect(10.75, 0.85, 1.7, 1.7);
+  ctx.beginPath(); ctx.moveTo(11.6, 0.85); ctx.lineTo(11.6, 0.6); ctx.moveTo(11.6, 2.55); ctx.lineTo(11.6, 2.8); ctx.stroke();
+  txt('LOW', 11.6, 0.48, 12, 500, '#55575C', 'center');
+  txt('CRITICAL', 11.6, 3.08, 12, 500, '#55575C', 'center');
+  txt('02', 10.28, 0.48, 12, 500, '#8C8E93');
+  txt(pad(counts.crit), 12.95, 3.08, 11, 500, '#FF4B1F', 'right');
+}
+function nubB(){ const M = MODS.B; box(11.42, 1.52, 11.78, 1.88, M.h, M.h + 0.16, ['#FF7A52','#FF4B1F'], '#B8330F', '#E04318'); }
+function decoC(){
+  txt('03  SOURCE', 10.28, 7.5, 12, 500, '#55575C');
+  txt('PIPELINE  ·  REPO', 10.28, 8.42, 11, 500, '#8C8E93');
+  txt('FIXED ' + pad(counts.fixed), 10.28, 9.3, 12, 500, '#0A9FC0');
+}
+
+function underGlow(mod, k, a){
+  const M = MODS[mod], [x, y] = iso((M.x0+M.x1)/2, (M.y0+M.y1)/2), rx = Math.hypot(M.x1-M.x0, M.y1-M.y0)*U*0.95;
+  const [R,G,B] = PAL[k];
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.translate(x, y); ctx.scale(1, 0.577);
+  const g = ctx.createRadialGradient(0,0,0,0,0,rx); g.addColorStop(0, `rgba(${R},${G},${B},${0.32*a})`); g.addColorStop(1, `rgba(${R},${G},${B},0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, 7); ctx.fill(); ctx.restore();
+}
+
+function drawTracks(){
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (const k in PP) { const pts = PP[k].pts; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    ctx.strokeStyle = '#232427'; ctx.lineWidth = 38; ctx.stroke(); ctx.strokeStyle = '#08090A'; ctx.lineWidth = 32; ctx.stroke(); }
+}
+function drawCells(){
+  const gd = glowImg.data, ss = 1;
+  ctx.imageSmoothingEnabled = true;
+  for (let i = 0; i < N; i++) {
+    let e = E[i], k = KC[i]; const g4 = i*4;
+    if (e > 0.03) { const c = PAL[k]; gd[g4] = c[0]; gd[g4+1] = c[1]; gd[g4+2] = c[2]; gd[g4+3] = Math.min(255, e*255); } else gd[g4+3] = 0;
+  }
+  glowX.putImageData(glowImg, 0, 0);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.drawImage(glowC, GX0 - SP/2, GY0 - RH/2, COLS*SP, ROWS*RH); ctx.restore();
+  for (let i = 0; i < N; i++) {
+    let e = E[i], k = KC[i], a;
+    if (e < BASE[i]) { e = BASE[i]; k = GREY; a = 0.18 + e*1.6; } else a = 0.25 + 0.75*e;
+    if (e < 0.035) continue;
+    const h = HH[i];
+    const g = e > 0.72 ? 0 : e > 0.45 ? (h < 0.5 ? 2 : 3) : e > 0.22 ? (h < 0.4 ? 1 : h < 0.7 ? 3 : 2) : 4;
+    const sz = SP*(0.72 + 0.38*e);
+    ctx.globalAlpha = Math.min(1, a); ctx.drawImage(SPR[g][k], CX[i] - sz/2, CY[i] - sz/2, sz, sz);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawParticles(names){
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const p of P) { if (p.hold > 0 || !names.includes(p.path)) continue;
+    const hs = p.k === GREY ? 26 : p.crit ? 46 + Math.sin(T*8 + p.j*9)*6 : 36; ctx.globalAlpha = p.k === GREY ? 0.35 : 0.8;
+    ctx.drawImage(HALO[p.k], p.x - hs/2, p.y - 6 - hs/2, hs, hs); }
+  ctx.restore();
+  for (const p of P) { if (p.hold > 0 || !names.includes(p.path)) continue;
+    const s = p.k === GREY ? 13 : p.crit ? 19 : 16; ctx.globalAlpha = p.k === GREY ? 0.8 : 1;
+    ctx.drawImage(SPR[p.g][p.k], p.x - s/2, p.y - 6 - s/2, s, s); }
+  ctx.globalAlpha = 1;
+}
+const LABELS = [['in', -250, 'UNMAPPED IDENTITIES', -1], ['safe', 205, 'LOW RISK · CLEARED', 1], ['risk', 0.55, 'CRITICAL · TO SOURCE', 1], ['ret', 0.3, 'RE-ENTERS INVENTORY', 1]];
+function drawLabels(){
+  ctx.font = '500 11px "Geist Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle';
+  try { ctx.letterSpacing = '1px'; } catch (e) {}
+  for (const [k, f, s, side] of LABELS) {
+    const d = f > 1 ? f : f < 0 ? PP[k].len + f : PP[k].len*f;
+    const [x, y, tx, ty] = at(k, d), nx = -ty*side, ny = tx*side, px = x + nx*34, py = y + ny*34;
+    ctx.fillStyle = '#F5F3F0'; ctx.beginPath(); ctx.arc(px, py, 9, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#0B0B0C'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(px-4, py); ctx.lineTo(px+4, py); ctx.moveTo(px, py-4); ctx.lineTo(px, py+4); ctx.stroke();
+    ctx.fillStyle = 'rgba(245,243,240,.62)'; ctx.textAlign = nx < 0 ? 'right' : 'left'; ctx.fillText(s, px + (nx < 0 ? -16 : 16), py);
+  }
+  try { ctx.letterSpacing = '0px'; } catch (e) {}
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+}
+function drawHandles(){
+  const r = 7/view.s;
+  for (const k in PP) { const pts = PP[k].pts;
+    ctx.setLineDash([6/view.s, 6/view.s]); ctx.strokeStyle = 'rgba(31,221,255,.55)'; ctx.lineWidth = 1.2/view.s;
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.setLineDash([]);
+    pts.forEach((p, i) => { ctx.fillStyle = '#F5F3F0'; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fill(); ctx.strokeStyle = '#1FDDFF'; ctx.lineWidth = 2/view.s; ctx.stroke(); });
+    ctx.font = `500 ${11/view.s}px "Geist Mono", monospace`; ctx.fillStyle = '#1FDDFF'; ctx.fillText(k.toUpperCase(), pts[0][0] + 12/view.s, pts[0][1] - 12/view.s);
+  }
+}
+
+// ---------- frame ----------
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), vw = innerWidth, vh = innerHeight;
+  cv.width = Math.round(vw*dpr); cv.height = Math.round(vh*dpr); view.dpr = dpr; view.vw = vw; view.vh = vh;
+}
+function update(dt, realDt){
+  spawnT -= dt; while (spawnT <= 0) { spawn(); spawnT += 0.3 + Math.random()*0.12; }
+  for (const p of P) {
+    if (p.hold > 0) { p.hold -= dt; if (p.hold <= 0) leave(p); continue; }
+    p.d += p.sp*dt;
+    if (p.path === 'safe' && p.d > 1500) { p.dead = true; continue; }
+    const len = PP[p.path].len;
+    if (p.d >= len) { arrive(p); if (p.dead) continue; }
+    const [x, y, tx, ty] = at(p.path, p.d), jit = p.path === 'in' ? 11 + Math.sin(T*3 + p.j*20)*3 : 2;
+    p.x = x - ty*p.j*jit; p.y = y + tx*p.j*jit;
+    dep(p.x, p.y, p.crit ? 22 : 17, dt*(p.k === GREY ? 3 : 5.5), p.k);
+  }
+  for (let i = P.length - 1; i >= 0; i--) if (P[i].dead) P.splice(i, 1);
+  const dec = Math.exp(-dt*1.7);
+  for (let i = 0; i < N; i++) { if (E[i] > 0.001) { E[i] *= dec; if (Math.random() < 0.004) HH[i] = Math.random(); } }
+  // ripple from the module in focus
+  const S = STEPS[editing ? 3 : step], M = MODS[S.mod], [rx, ry] = iso((M.x0+M.x1)/2, (M.y0+M.y1)/2), RMAX = 420;
+  ripR = (ripR + dt*150) % RMAX;
+  const amt = 0.09*(1 - ripR/RMAX), r0 = Math.max(0, Math.floor((ry - RMAX*0.6 - GY0)/RH)), r1 = Math.min(ROWS-1, Math.ceil((ry + RMAX*0.6 - GY0)/RH));
+  for (let r = r0; r <= r1; r++) for (let c = 0; c < COLS; c++) { const i = r*COLS + c, dx = CX[i]-rx; if (Math.abs(dx) > RMAX) continue;
+    const de = Math.hypot(dx, (CY[i]-ry)*1.73); if (Math.abs(de - ripR) < 9 && HH[i] > 0.3) { if (E[i] < 0.15) KC[i] = S.k; E[i] = Math.min(1, E[i] + amt); } }
+  if (mouse.on && !editing) dep(mouse.x, mouse.y, 70, dt*1.6, Math.max(0, Math.min(23, Math.round((mouse.x/SW)*23))));
+  // story timing + camera
+  if (!editing && !RM.matches) { stepT += realDt; if (stepT > STEP_DUR) setStep(step + 1); }
+  const bar = stepEls[step].querySelector('.rail i'); if (bar) bar.style.setProperty('--p', RM.matches || editing ? 1 : Math.min(1, stepT/STEP_DUR).toFixed(3));
+  const tgt = STEPS[editing ? 3 : step], [fx, fy] = tgt.focus(), a = 1 - Math.exp(-realDt*1.8);
+  cam.x += (fx - cam.x)*a; cam.y += (fy - cam.y)*a; cam.z += (tgt.z - cam.z)*a;
+}
+function render(){
+  const { dpr, vw, vh } = view, narrow = vw < 760;
+  const fit = Math.min(vw/SW, vh/SH) * (narrow ? 1.25 : 1), s = fit*cam.z;
+  const fx = narrow ? vw*0.5 : vw*0.6, fy = narrow ? vh*0.4 : vh*0.44;
+  view.s = s; view.tx = fx - cam.x*s; view.ty = fy - cam.y*s;
+  ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  ctx.fillStyle = '#0B0B0C'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const bg = ctx.createRadialGradient(cv.width*0.58, cv.height*0.5, 0, cv.width*0.58, cv.height*0.5, Math.max(cv.width, cv.height)*0.6);
+  bg.addColorStop(0, '#17181A'); bg.addColorStop(1, '#0B0B0C'); ctx.fillStyle = bg; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(dpr*s, 0, 0, dpr*s, dpr*view.tx, dpr*view.ty);
+
+  if (img) { const r = Math.max(SW/img.width, SH/img.height), w = img.width*r, h = img.height*r; ctx.drawImage(img, (SW - w)/2, (SH - h)/2, w, h); }
+  if (showGeo) {
+    box(-0.7, -0.7, 13.9, 3.9, 0, 0.1, '#151517', '#0D0D0E', '#121213');
+    box(9.3, 6.3, 13.9, 10.3, 0, 0.1, '#151517', '#0D0D0E', '#121213');
+    drawTracks();
+  }
+  drawCells();
+  const S = STEPS[editing ? 3 : step], pulse = 0.75 + 0.25*Math.sin(T*2.2);
+  if (showGeo) underGlow(S.mod, S.k, pulse);
+  if (showGeo) module(MODS.A, decoA);
+  drawParticles(['ab', 'safe']);
+  if (showGeo) { module(MODS.B, decoB); nubB(); }
+  drawParticles(['risk', 'ret']);
+  if (showGeo) module(MODS.C, decoC);
+  drawParticles(['in']);
+  drawLabels();
+  if (editing) drawHandles();
+
+  ctx.setTransform(1,0,0,1,0,0);
+  const vg = ctx.createRadialGradient(cv.width*0.55, cv.height*0.5, Math.min(cv.width, cv.height)*0.35, cv.width*0.55, cv.height*0.5, Math.max(cv.width, cv.height)*0.78);
+  vg.addColorStop(0, 'rgba(11,11,12,0)'); vg.addColorStop(1, 'rgba(11,11,12,.45)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
+}
+function loop(now){
+  const realDt = Math.min(0.05, (now - last)/1000); last = now;
+  const dt = realDt*(RM.matches ? 0.35 : 1); T += dt;
+  update(dt, realDt); render(); requestAnimationFrame(loop);
+}
+
+// ---------- input ----------
+const toStage = e => [(e.clientX - view.tx)/view.s, (e.clientY - view.ty)/view.s];
+cv.addEventListener('pointermove', e => {
+  const [x, y] = toStage(e); mouse.x = x; mouse.y = y; mouse.on = e.pointerType === 'mouse';
+  if (drag) { PATHS[drag[0]][drag[1]] = [Math.round(x), Math.round(y)]; prepPaths(); }
+});
+cv.addEventListener('pointerleave', () => { mouse.on = false; });
+cv.addEventListener('pointerdown', e => {
+  if (!editing) return; const [x, y] = toStage(e), R = 16/view.s; let best = null, bd = R;
+  for (const k in PATHS) PATHS[k].forEach((p, i) => { const d = Math.hypot(p[0]-x, p[1]-y); if (d < bd) { bd = d; best = [k, i]; } });
+  if (best) { drag = best; cv.setPointerCapture(e.pointerId); document.body.classList.add('dragging'); }
+});
+cv.addEventListener('pointerup', () => { if (!drag) return; drag = null; document.body.classList.remove('dragging'); buildBase(); savePaths(); syncJson(); });
+
+const $ = id => document.getElementById(id);
+const panel = $('panel'), json = $('json'), msg = $('msg');
+function savePaths(){ try { localStorage.setItem('avistar-flow-paths-v2', JSON.stringify(PATHS)); } catch (e) {} }
+function syncJson(){ json.value = JSON.stringify(PATHS); }
+function say(t){ msg.textContent = t; clearTimeout(say.t); say.t = setTimeout(() => msg.textContent = '', 2600); }
+function setEditing(on){ editing = on; panel.hidden = !on; document.body.classList.toggle('editing', on); if (on) syncJson(); }
+$('copy').onclick = () => { syncJson(); const done = () => say('Line data copied'); if (navigator.clipboard) navigator.clipboard.writeText(json.value).then(done, () => { json.select(); say('Press Cmd+C or Ctrl+C to copy'); }); else { json.select(); say('Press Cmd+C or Ctrl+C to copy'); } };
+$('apply').onclick = () => { try { const o = JSON.parse(json.value); if (!valid(o)) throw 0; PATHS = o; prepPaths(); buildBase(); savePaths(); say('Lines applied'); } catch (e) { say('That data is not valid line JSON. Copy it again from this panel.'); } };
+$('reset').onclick = () => { PATHS = defaultPaths(); prepPaths(); buildBase(); savePaths(); syncJson(); say('Lines reset to the machine layout'); };
+function loadFile(f){ if (!f || !f.type.startsWith('image/')) return; const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { img = im; showGeo = false; setEditing(true); say('Image added. Drag the dots to match it.'); }; im.src = r.result; }; r.readAsDataURL(f); }
+$('file').onchange = e => loadFile(e.target.files[0]);
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); });
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean');
+  if (e.key === 'e' || e.key === 'E') setEditing(!editing);
+  if (e.key === 'i' || e.key === 'I') $('file').click();
+  if (e.key === 'm' || e.key === 'M') showGeo = !showGeo;
+  if (e.key === 'ArrowRight') setStep(step + 1);
+  if (e.key === 'ArrowLeft') setStep(step - 1);
+});
+addEventListener('resize', resize);
+
+// ---------- boot ----------
+resize(); prepPaths(); buildBase();
+for (let i = 0; i < 720; i++) update(1/30, 0);   // warm up so the machine is already running on first frame
+const f0 = STEPS[0].focus(); cam.x = f0[0]; cam.y = f0[1]; cam.z = STEPS[0].z; stepT = 0;
+requestAnimationFrame(t => { last = t; loop(t); });
+})();
+</script>
+</body>
+</html>
