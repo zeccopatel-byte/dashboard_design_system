@@ -229,7 +229,7 @@ const BASE_CSS = `/* Avistar Dashboard · components.css · v2.0 — requires to
 .av-root *,.av-root *::before,.av-root *::after{box-sizing:border-box}
 .av-icon{display:inline-block;flex-shrink:0;vertical-align:middle}
 .av-mono{font-family:var(--av-font-mono)}
-.av-eyebrow{font:500 11px/1.2 var(--av-font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--av-text-helper)}
+.av-eyebrow{font:500 11px/1.45 var(--av-font-mono);text-wrap:balance;letter-spacing:.14em;text-transform:uppercase;color:var(--av-text-helper)}
 .av-text-gradient{background:var(--av-gradient-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
 .av-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .av-stack{display:flex;flex-direction:column;gap:12px}.av-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
@@ -1048,12 +1048,21 @@ css:`.av-tabs{display:flex;gap:4px;border-bottom:1px solid var(--av-border-subtl
 .av-tabs--pill .av-tab[aria-selected="true"]{background:var(--av-layer-05);box-shadow:inset 0 0 0 1px var(--av-border-subtle-00)}
 .av-tabs--vertical{flex-direction:column;gap:2px;width:min(220px,100%);border:0}
 .av-tabs--vertical .av-tab{height:40px;margin:0;border:0;border-radius:var(--av-radius-lg);justify-content:flex-start}
-.av-tabs--vertical .av-tab[aria-selected="true"]{background:var(--av-layer-03)}`,
+.av-tabs--vertical .av-tab[aria-selected="true"]{background:var(--av-layer-03)}
+.av-tab{flex-shrink:0;white-space:nowrap}.av-tab[hidden]{display:none!important}
+.av-tabs:not(.av-tabs--vertical){scrollbar-width:none}.av-tabs:not(.av-tabs--vertical)::-webkit-scrollbar{display:none}
+.av-tabs__more{position:relative;display:flex;margin-left:auto;flex-shrink:0}.av-tabs__more[hidden]{display:none}
+.av-tabs__more-btn{width:var(--av-touch);justify-content:center;padding:0}
+.av-tabs__menu{position:absolute;top:calc(100% + 6px);right:0;z-index:var(--av-z-dropdown,50);min-width:200px;max-width:min(280px,90vw);display:flex;flex-direction:column;padding:6px;border:1px solid var(--av-border-subtle-01);border-radius:var(--av-radius-xl,14px);background:var(--av-layer-02);box-shadow:var(--av-shadow-dropdown,0 16px 40px rgba(0,0,0,.4))}
+.av-tabs__menu[hidden]{display:none}
+.av-tabs__menu .av-menu__item{display:flex;align-items:center;gap:8px;min-height:var(--av-touch);padding:0 12px;border:0;border-radius:var(--av-radius-md);background:transparent;color:var(--av-text-secondary);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.av-tabs__menu .av-menu__item:hover{background:var(--av-layer-hover-01);color:var(--av-text-primary)}`,
 variants:[
  {name:'Line', html:`<div class="av-tabs" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Summary</button><button class="av-tab" role="tab">Permissions</button><button class="av-tab" role="tab">Activity</button><button class="av-tab" role="tab" disabled>Policies</button></div>`},
  {name:'With counts', html:`<div class="av-tabs" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Open<span class="av-tab__count">293</span></button><button class="av-tab" role="tab">Resolved<span class="av-tab__count">1,204</span></button><button class="av-tab" role="tab">Ignored<span class="av-tab__count">12</span></button></div>`},
  {name:'Pill', html:`<div class="av-tabs av-tabs--pill" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Trend</button><button class="av-tab" role="tab">By severity</button><button class="av-tab" role="tab">By provider</button></div>`},
  {name:'Vertical', html:`<div class="av-tabs av-tabs--vertical" role="tablist"><button class="av-tab" role="tab" aria-selected="true">General</button><button class="av-tab" role="tab">Members</button><button class="av-tab" role="tab">Billing</button><button class="av-tab" role="tab">Danger zone</button></div>`},
+ {name:'Overflow → more menu', note:'Tabs that don’t fit collapse into a ⋯ menu (priority+). The selected tab always stays visible. Runtime: AvCharts.hydrate() in av-charts.js.', html:`<div style="max-width:340px;width:100%"><div class="av-tabs" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Summary</button><button class="av-tab" role="tab">Permissions</button><button class="av-tab" role="tab">Activity</button><button class="av-tab" role="tab">Policies</button><button class="av-tab" role="tab">Access keys</button><button class="av-tab" role="tab">Settings</button></div></div>`},
 ]},
 
 { id:'tag', label:'Tag', desc:'Severity pills with dot, mono outline tags (providers, roles), count badges, delta chips, filter chips.',
@@ -1286,6 +1295,33 @@ const RESPONSIVE_CSS = `/* ── Responsive layer · fluid, container-driven (3
   .av-score-card{flex-direction:column;align-items:flex-start}
   .av-split .av-btn:first-child{flex:1}
 }
+/* mobile: topbar menu, tables → cards, modals → bottom sheets */
+.av-topbar__menu{display:none;flex-shrink:0}
+.av-main>*{flex-shrink:0}
+.av-table-toolbar__title{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;line-height:1.35}.av-table-toolbar__count{margin-left:0}
+@container av-root (max-width: 900px){
+  .av-topbar__menu{display:inline-flex}
+}
+@container av-root (max-width: 560px){
+  .av-topbar{flex-wrap:nowrap;gap:8px}
+  .av-topbar>nav{flex:1 1 auto}.av-topbar>nav+.av-topbar__spacer{display:none}
+  .av-topbar .av-btn--primary{width:var(--av-touch);min-width:var(--av-touch);padding:0;gap:0;font-size:0;justify-content:center;flex-shrink:0}
+  .av-topbar .av-breadcrumb--context>li:nth-child(-n+2){display:none}
+  .av-tabs--pill{display:flex;width:100%}.av-tabs--pill>.av-tab{flex:1 1 0;justify-content:center;min-width:0;padding:0 8px}
+  .av-table-toolbar>*{flex:1 1 100%}.av-table-toolbar .av-row{flex-wrap:nowrap}.av-table-toolbar .av-row>.av-search{flex:1 1 auto;min-width:0;width:auto!important}
+  .av-table-wrap{overflow-x:hidden}.av-table tbody tr{width:100%;min-width:0}
+  .av-table{display:block;min-width:0}.av-table thead{display:none}.av-table tbody{display:block}
+  .av-table tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:14px 16px;border-bottom:1px solid var(--av-border-subtle-00)}
+  .av-table tbody tr:last-child{border-bottom:0}
+  .av-table td{display:block;height:auto;padding:0;border:0}
+  .av-table td:first-child:not(.av-table__check),.av-table__check+td{flex:1 1 calc(100% - 52px);min-width:0}
+  .av-table__check{width:auto}.av-table td.av-table__num{margin-left:auto}
+  .av-table__id{overflow-wrap:anywhere}
+  .av-modal-scrim{align-items:flex-end;padding:0}
+  .av-modal,.av-modal--lg{width:100%;max-height:92%;border-radius:20px 20px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom)}
+  .av-modal::before{content:"";align-self:center;flex-shrink:0;width:36px;height:4px;margin-top:8px;border-radius:2px;background:var(--av-border-strong-01)}
+  .av-modal__foot>.av-btn{flex:1 1 0}
+}
 @container av-root (min-width: 1800px){.av-main{max-width:min(1440px,100%)}}
 `;
 
@@ -1392,7 +1428,7 @@ css:`.av-shell{display:flex;min-height:100vh;background:var(--av-background);col
 .av-main{width:100%;max-width:var(--av-content-max);margin:0 auto;padding:32px clamp(16px,3vw,40px) 80px;display:flex;flex-direction:column;gap:28px}`,
 variants:[{name:'Shell', html:`<div class="av-shell" style="min-height:0;height:420px;border:1px solid var(--av-border-subtle-00);border-radius:16px;overflow:hidden">
   <aside class="av-sidebar av-sidebar--collapsed" style="height:auto"><div class="av-sidebar__brand"><img src="assets/mark-shape2.svg" alt="Avistar" width="28" height="25"></div><nav class="av-sidebar__nav"><a class="av-nav-item" aria-current="page" href="#"><img class="av-nav-item__glyph" src="assets/mascots/magnifier.png" alt=""></a><a class="av-nav-item" href="#"><img class="av-nav-item__glyph" src="assets/mascots/shield.png" alt=""></a><a class="av-nav-item" href="#"><img class="av-nav-item__glyph" src="assets/mascots/key.png" alt=""></a></nav></aside>
-  <div class="av-shell__body"><header class="av-topbar" style="position:relative"><span class="av-breadcrumb">Avistar Demo Org / Tidewell</span><span style="flex:1"></span><button class="av-btn av-btn--primary">${ic('plus',14,2.2)}Connect account</button></header>
+  <div class="av-shell__body"><header class="av-topbar" style="position:relative"><button class="av-icon-btn av-topbar__menu" aria-label="Open menu">${ic('list',18,1.8)}</button><span class="av-breadcrumb" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Avistar Demo Org / Tidewell</span><span style="flex:1"></span><button class="av-btn av-btn--primary">${ic('plus',14,2.2)}Connect account</button></header>
   <main class="av-main" style="padding-top:24px"><div class="av-page-head"><div class="av-page-head__text"><span class="av-eyebrow">Tidewell · 2 accounts</span><h1 class="av-page-head__title">Overview</h1></div></div></main></div>
 </div>`}]},
 
@@ -1458,6 +1494,7 @@ css:`.av-topbar{position:sticky;top:0;z-index:var(--av-z-header);height:var(--av
 .av-topbar--intro{height:72px;padding:0 clamp(20px,4vw,48px);border-bottom-color:var(--av-border-divider);background:var(--av-background-intro)}`,
 variants:[
  {name:'Dashboard', html:`<header class="av-topbar" style="position:relative">
+  <button class="av-icon-btn av-topbar__menu" aria-label="Open menu">${ic('list',18,1.8)}</button>
   <nav aria-label="Context"><ol class="av-breadcrumb av-breadcrumb--context"><li>Avistar Demo Org</li><li class="av-breadcrumb__sep">/</li><li style="color:var(--av-text-primary)">Tidewell</li><li class="av-breadcrumb__sep">/</li><li style="display:flex;align-items:center;gap:8px"><img class="av-breadcrumb__logo" src="assets/logo-aws-dark.svg" alt="AWS"><span aria-current="page">Production Demo Account</span></li><li class="av-breadcrumb__chev">${ic('chevDown',16,2)}</li></ol></nav>
   <span class="av-topbar__spacer"></span>
   <button class="av-btn av-btn--primary">${ic('plus',14,2.2)}Connect account</button>
@@ -1484,7 +1521,7 @@ variants:[
 
 { id:'page-header', label:'Page header', desc:'Mono eyebrow (context) → H1 → one-line status. Actions bottom-right: link action then primary.',
 css:`.av-page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
-.av-page-head__text{display:flex;flex-direction:column;gap:8px;min-width:0}
+.av-page-head__text{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 min(100%,280px)}
 .av-page-head__title{margin:0;font-size:clamp(28px,3vw,36px);font-weight:600;letter-spacing:-0.03em;line-height:1.05}
 .av-page-head__sub{margin:0;font-size:15px;color:var(--av-text-tertiary);text-wrap:pretty}
 .av-page-head__actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}`,

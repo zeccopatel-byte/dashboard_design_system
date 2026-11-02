@@ -22,7 +22,7 @@ export const BASE_CSS = `/* Avistar Dashboard · components.css · v2.0 — requ
 .av-root *,.av-root *::before,.av-root *::after{box-sizing:border-box}
 .av-icon{display:inline-block;flex-shrink:0;vertical-align:middle}
 .av-mono{font-family:var(--av-font-mono)}
-.av-eyebrow{font:500 11px/1.2 var(--av-font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--av-text-helper)}
+.av-eyebrow{font:500 11px/1.45 var(--av-font-mono);text-wrap:balance;letter-spacing:.14em;text-transform:uppercase;color:var(--av-text-helper)}
 .av-text-gradient{background:var(--av-gradient-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
 .av-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .av-stack{display:flex;flex-direction:column;gap:12px}.av-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
@@ -841,12 +841,21 @@ css:`.av-tabs{display:flex;gap:4px;border-bottom:1px solid var(--av-border-subtl
 .av-tabs--pill .av-tab[aria-selected="true"]{background:var(--av-layer-05);box-shadow:inset 0 0 0 1px var(--av-border-subtle-00)}
 .av-tabs--vertical{flex-direction:column;gap:2px;width:min(220px,100%);border:0}
 .av-tabs--vertical .av-tab{height:40px;margin:0;border:0;border-radius:var(--av-radius-lg);justify-content:flex-start}
-.av-tabs--vertical .av-tab[aria-selected="true"]{background:var(--av-layer-03)}`,
+.av-tabs--vertical .av-tab[aria-selected="true"]{background:var(--av-layer-03)}
+.av-tab{flex-shrink:0;white-space:nowrap}.av-tab[hidden]{display:none!important}
+.av-tabs:not(.av-tabs--vertical){scrollbar-width:none}.av-tabs:not(.av-tabs--vertical)::-webkit-scrollbar{display:none}
+.av-tabs__more{position:relative;display:flex;margin-left:auto;flex-shrink:0}.av-tabs__more[hidden]{display:none}
+.av-tabs__more-btn{width:var(--av-touch);justify-content:center;padding:0}
+.av-tabs__menu{position:absolute;top:calc(100% + 6px);right:0;z-index:var(--av-z-dropdown,50);min-width:200px;max-width:min(280px,90vw);display:flex;flex-direction:column;padding:6px;border:1px solid var(--av-border-subtle-01);border-radius:var(--av-radius-xl,14px);background:var(--av-layer-02);box-shadow:var(--av-shadow-dropdown,0 16px 40px rgba(0,0,0,.4))}
+.av-tabs__menu[hidden]{display:none}
+.av-tabs__menu .av-menu__item{display:flex;align-items:center;gap:8px;min-height:var(--av-touch);padding:0 12px;border:0;border-radius:var(--av-radius-md);background:transparent;color:var(--av-text-secondary);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.av-tabs__menu .av-menu__item:hover{background:var(--av-layer-hover-01);color:var(--av-text-primary)}`,
 variants:[
  {name:'Line', html:`<div class="av-tabs" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Summary</button><button class="av-tab" role="tab">Permissions</button><button class="av-tab" role="tab">Activity</button><button class="av-tab" role="tab" disabled>Policies</button></div>`},
  {name:'With counts', html:`<div class="av-tabs" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Open<span class="av-tab__count">293</span></button><button class="av-tab" role="tab">Resolved<span class="av-tab__count">1,204</span></button><button class="av-tab" role="tab">Ignored<span class="av-tab__count">12</span></button></div>`},
  {name:'Pill', html:`<div class="av-tabs av-tabs--pill" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Trend</button><button class="av-tab" role="tab">By severity</button><button class="av-tab" role="tab">By provider</button></div>`},
  {name:'Vertical', html:`<div class="av-tabs av-tabs--vertical" role="tablist"><button class="av-tab" role="tab" aria-selected="true">General</button><button class="av-tab" role="tab">Members</button><button class="av-tab" role="tab">Billing</button><button class="av-tab" role="tab">Danger zone</button></div>`},
+ {name:'Overflow → more menu', note:'Tabs that don’t fit collapse into a ⋯ menu (priority+). The selected tab always stays visible. Runtime: AvCharts.hydrate() in av-charts.js.', html:`<div style="max-width:340px;width:100%"><div class="av-tabs" role="tablist"><button class="av-tab" role="tab" aria-selected="true">Summary</button><button class="av-tab" role="tab">Permissions</button><button class="av-tab" role="tab">Activity</button><button class="av-tab" role="tab">Policies</button><button class="av-tab" role="tab">Access keys</button><button class="av-tab" role="tab">Settings</button></div></div>`},
 ]},
 
 { id:'tag', label:'Tag', desc:'Severity pills with dot, mono outline tags (providers, roles), count badges, delta chips, filter chips.',

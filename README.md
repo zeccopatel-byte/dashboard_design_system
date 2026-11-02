@@ -1,7 +1,17 @@
-# Avistar Dashboard Design System
+# Avistar Dashboard Design System v2
 
-Static site — single self-contained `index.html`.
+Static site — no build step. Open `index.html` through any web server.
 
-## Deploy
-1. Upload all files in this folder to a GitHub repo (root level).
-2. vercel.com/new → Import the repo → Framework: Other → Deploy.
+```
+npx serve .
+```
+
+## Structure
+- `index.html` — design system documentation app
+- `support.js` — page runtime
+- `ds/` — library: tokens, components, patterns, cards, charts runtime (`av-charts.js`)
+- `orb.js` — orb renderer
+- `assets/` — logo mark, wordmark, provider logos, icons, mascots, illustrations, patterns
+
+## Deploy (Vercel)
+Import this repo in Vercel → Framework preset **Other**, no build command, output directory `.`. Every push to `main` redeploys.

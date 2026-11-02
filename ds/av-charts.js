@@ -2,6 +2,7 @@
 // Usage: <script src="orb.js"></script><script src="av-charts.js"></script> then AvCharts.hydrate(document)
 // Ring:  <canvas data-av-ring data-values="[64,36]" data-colors='["#FF4B1F","var(--av-border-strong-02)"]' data-grad></canvas>
 // Orb:   <canvas data-av-orb="critical|high|medium|low|hub"></canvas>
+// Tabs:  any .av-tabs (not --vertical) gets a ⋯ overflow menu when its tabs don't fit.
 (function () {
   const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
   const resolve = (el, c) => { const m = /^var\((--[^)]+)\)$/.exec(c); return m ? getComputedStyle(el).getPropertyValue(m[1]).trim() || '#3A3A40' : c; };
@@ -38,10 +39,33 @@
     const go = () => { if (!el.isConnected) return; if (!window.AvistarOrb) return setTimeout(go, 80); try { el._avOrb = window.AvistarOrb.create(el, () => ({ activity: .12 + .1 * Math.sin(performance.now() / 700 + ph), colors: cols, speed: .9, animated: true })); } catch (e) {} };
     go();
   }
+  const DOTS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>';
+  // Tabs priority+: tabs that don't fit collapse into a ⋯ menu; selected tab stays visible.
+  function fitTabs(t) {
+    const tabs = [...t.querySelectorAll(':scope>.av-tab')]; let more = t.querySelector(':scope>.av-tabs__more');
+    if (!more) {
+      more = document.createElement('div'); more.className = 'av-tabs__more';
+      more.innerHTML = '<button class="av-tab av-tabs__more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More tabs">' + DOTS + '</button><div class="av-tabs__menu" role="menu" hidden></div>';
+      t.appendChild(more); const btn = more.firstChild, menu = more.lastChild;
+      const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+      btn.onclick = e => { e.stopPropagation(); const o = menu.hidden; menu.hidden = !o; btn.setAttribute('aria-expanded', String(o)); };
+      document.addEventListener('click', e => { if (!more.contains(e.target)) close(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+      t.addEventListener('click', e => { const b = e.target.closest('.av-tab'); if (!b || b === btn || b.disabled || b.parentElement !== t) return; tabs.forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false')); fitTabs(t); });
+    }
+    const menu = more.lastChild; tabs.forEach(x => x.hidden = false); more.hidden = true; t.style.overflowX = ''; menu.innerHTML = '';
+    if (t.scrollWidth <= t.clientWidth + 1) return;
+    more.hidden = false; t.style.overflowX = 'visible';
+    const gap = parseFloat(getComputedStyle(t).columnGap) || 0, avail = t.clientWidth - more.offsetWidth - gap - 8;
+    const sel = tabs.find(x => x.getAttribute('aria-selected') === 'true'); let used = sel ? sel.offsetWidth + gap : 0, full = false; const hid = [];
+    tabs.forEach(x => { if (x === sel) return; const w = x.offsetWidth + gap; if (!full && used + w <= avail) used += w; else { full = true; hid.push(x); } });
+    hid.forEach(x => { x.hidden = true; const m = document.createElement('button'); m.type = 'button'; m.className = 'av-menu__item'; m.setAttribute('role', 'menuitem'); m.innerHTML = x.innerHTML; m.disabled = x.disabled; m.onclick = () => { x.click(); }; menu.appendChild(m); });
+  }
   function hydrate(root) {
+    (root || document).querySelectorAll('.av-tabs:not(.av-tabs--vertical):not([data-av-done])').forEach(t => { t.setAttribute('data-av-done', ''); fitTabs(t); if (window.ResizeObserver) { let w = 0; new ResizeObserver(() => { if (t.clientWidth !== w) { w = t.clientWidth; fitTabs(t); } }).observe(t); } });
     (root || document).querySelectorAll('canvas[data-av-ring]:not([data-av-done])').forEach(el => { el.setAttribute('data-av-done', ''); animateRing(el); });
     (root || document).querySelectorAll('canvas[data-av-orb]:not([data-av-done])').forEach(el => { el.setAttribute('data-av-done', ''); mountOrb(el); });
   }
   function redraw(root) { (root || document).querySelectorAll('canvas[data-av-ring]').forEach(el => drawRing(el, JSON.parse(el.dataset.values), JSON.parse(el.dataset.colors), { grad: el.hasAttribute('data-grad'), hi: el.dataset.hi != null ? +el.dataset.hi : undefined })); }
-  window.AvCharts = { drawRing, hydrate, redraw, mountOrb };
+  window.AvCharts = { drawRing, hydrate, redraw, mountOrb, fitTabs };
 })();
